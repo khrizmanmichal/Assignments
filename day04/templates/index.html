@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two-way ANOVA</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #17212b;
+      background: #f3f6f8;
+    }
+    body { margin: 0; }
+    main { max-width: 900px; margin: 36px auto; padding: 0 20px; }
+    h1 { margin-bottom: 8px; }
+    p { line-height: 1.5; }
+    .panel {
+      margin: 18px 0;
+      padding: 20px;
+      border: 1px solid #d5dde4;
+      border-radius: 8px;
+      background: #fff;
+    }
+    .factors { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    label { display: block; font-weight: 600; }
+    input {
+      box-sizing: border-box;
+      width: 100%;
+      margin-top: 6px;
+      padding: 10px;
+      border: 1px solid #9aa9b5;
+      border-radius: 4px;
+      font: inherit;
+    }
+    .hint { margin: 6px 0 0; color: #52616d; font-size: .92rem; }
+    .measurement-row {
+      display: grid;
+      grid-template-columns: minmax(150px, 1fr) 2fr;
+      gap: 14px;
+      align-items: center;
+      margin: 10px 0;
+    }
+    .measurement-row label { font-weight: 500; }
+    button {
+      padding: 11px 20px;
+      border: 0;
+      border-radius: 4px;
+      background: #145da0;
+      color: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #0e477c; }
+    .error { border-color: #b42318; color: #8d1b13; background: #fff4f2; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px; border-bottom: 1px solid #d5dde4; text-align: left; }
+    th { background: #edf2f6; }
+    @media (max-width: 600px) {
+      main { margin-top: 20px; }
+      .factors, .measurement-row { grid-template-columns: 1fr; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Two-way ANOVA</h1>
+    <p>
+      Enter independent measurements for each group-treatment combination.
+      Separate replicate measurements with commas. The analysis reports the
+      group, treatment, and interaction effects.
+    </p>
+
+    {% if error %}
+    <section class="panel error" role="alert">{{ error }}</section>
+    {% endif %}
+
+    <form method="post">
+      <section class="panel">
+        <div class="factors">
+          <label for="groups">Groups
+            <input id="groups" name="groups" value="{{ groups_value }}" required>
+          </label>
+          <label for="treatments">Treatments
+            <input id="treatments" name="treatments" value="{{ treatments_value }}" required>
+          </label>
+        </div>
+        <p class="hint">Separate names with commas. Enter at least two unique names for each factor.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Measurements</h2>
+        <p class="hint">Enter one or more finite numbers for every combination, separated by commas.</p>
+        <div id="measurement-fields"></div>
+      </section>
+
+      <button type="submit">Run ANOVA</button>
+    </form>
+
+    {% if results %}
+    <section class="panel" aria-live="polite">
+      <h2>ANOVA results (Type II sums of squares)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Effect</th>
+            <th>F statistic</th>
+            <th>p-value</th>
+            <th>Partial eta-squared</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for result in results %}
+          <tr>
+            <td>{{ result.source }}</td>
+            <td>{{ result.f_statistic }}</td>
+            <td>{{ result.p_value }}</td>
+            <td>{{ result.partial_eta_squared }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <p>
+        A small p-value (commonly &lt; 0.05) is evidence of an effect.
+        A significant interaction means the treatment effect differs by group,
+        so interpret the main effects cautiously.
+      </p>
+    </section>
+    {% endif %}
+
+    <section class="panel">
+      <h2>About this analysis</h2>
+      <p>
+        ANOVA compares average measurements to test whether group, treatment,
+        or their interaction is associated with differences. It assumes
+        independent observations, approximately normal residuals, and similar
+        variance across combinations. Partial eta-squared is an ANOVA effect
+        size. This program is for independent observations, not repeated
+        measurements on the same subjects.
+      </p>
+    </section>
+  </main>
+  <script>
+    const groupsInput = document.getElementById("groups");
+    const treatmentsInput = document.getElementById("treatments");
+    const fields = document.getElementById("measurement-fields");
+    const previousMeasurements = {{ measurements | tojson }};
+
+    function makeMeasurementFields() {
+      fields.replaceChildren();
+      const groups = groupsInput.value.split(",").map(value => value.trim()).filter(Boolean);
+      const treatments = treatmentsInput.value.split(",").map(value => value.trim()).filter(Boolean);
+      let index = 0;
+
+      for (const group of groups) {
+        for (const treatment of treatments) {
+          const row = document.createElement("div");
+          row.className = "measurement-row";
+          const label = document.createElement("label");
+          label.htmlFor = `measurement-${index}`;
+          label.textContent = `${group} / ${treatment}`;
+          const input = document.createElement("input");
+          input.id = `measurement-${index}`;
+          input.name = `measurement_${index}`;
+          input.placeholder = "e.g. 1.2, 1.5, 1.8";
+          input.value = previousMeasurements[index] || "";
+          row.append(label, input);
+          fields.append(row);
+          index += 1;
+        }
+      }
+    }
+
+    groupsInput.addEventListener("input", makeMeasurementFields);
+    treatmentsInput.addEventListener("input", makeMeasurementFields);
+    makeMeasurementFields();
+  </script>
+</body>
+</html>
