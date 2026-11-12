@@ -3,10 +3,20 @@
 This interactive program tests independent measurements for effects of two factors: group, treatment, and their interaction. It reports an F statistic, p-value, and partial eta-squared effect size for each effect. Partial eta-squared estimates the share of effect-plus-error variation associated
 with that ANOVA effect.
 
-Prompts used with Copilot: write me a python program that can perfrom anova on data from biological expreiments. The program should have a clear interface where the names of the groups and treatments are inserted as well as the measurements, and produce not only the anova but also the p value.
-Later, I asked it to have a nice gui: i want this program to open nicely in a sepereate window does it need to be changed to html for that?
-next prompt: two changes: I want you to add the final paragraph of the readme into the gui itself (that explain what anova is). i also want you to make the instructions of the gui installation much simpler and clearer for a person who has no background with these things
-final prompt:add to the gui an option to upload an excel file with instructions on how to structure it. I also asked it to have seperate measurements in different columns, not rows.
+## Day 4 overview
+
+Day 4 was about turning the two-way ANOVA idea into something easier to use in real life. I started with a simple Python program that could read group names, treatment names, and measurements, then calculate the ANOVA results and p-values for the main effects and interaction.
+
+I then asked Copilot to improve it into a desktop-style GUI so it would open in a separate window, and later to add an explanation of ANOVA directly into the interface. I also asked for clearer installation steps for someone who is not familiar with Python or terminal commands. Finally, I added Excel upload support so the tool could read biological data from a spreadsheet with separate measurement columns instead of one long list of rows.
+
+### Prompts used with Copilot
+
+- "Write me a Python program that can perform ANOVA on data from biological experiments. The program should have a clear interface where the names of the groups and treatments are entered, along with the measurements, and it should produce the ANOVA results and p-values."
+- "Make this program open in a nice separate window. Does it need to be changed to HTML for that?"
+- "Add the ANOVA explanation paragraph into the GUI itself, and make the installation instructions much simpler and clearer for someone with no background in this."
+- "Add an option to upload an Excel file with instructions on how to structure it. I also want the measurements in separate columns rather than rows."
+
+This is what I built: a working two-way ANOVA tool with a simple interface, a desktop GUI, a web version, and an Excel import feature that reads biological replicate data in a clear tabular format.
 
 ## Run the web application
 
