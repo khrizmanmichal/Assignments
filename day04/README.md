@@ -15,6 +15,8 @@ I then asked Copilot to improve it into a desktop-style GUI so it would open in 
 - "Make this program open in a nice separate window. Does it need to be changed to HTML for that?"
 - "Add the ANOVA explanation paragraph into the GUI itself, and make the installation instructions much simpler and clearer for someone with no background in this."
 - "Add an option to upload an Excel file with instructions on how to structure it. I also want the measurements in separate columns rather than rows."
+- "Write some tests for the "business logic" of your previous applications. You can put them in your day04."
+- "ok but we need to independantely verify the calculation. if you need an external data set let me know"
 
 This is what I built: a working two-way ANOVA tool with a simple interface, a desktop GUI, a web version, and an Excel import feature that reads biological replicate data in a clear tabular format.
 
@@ -102,10 +104,57 @@ reader.
 py .\day04\two_way_anova.py
 ```
 
-## Run the web app tests
+## Run the tests
 
 ```powershell
 Push-Location .\day04
 py -m unittest discover -s .\tests
 Pop-Location
 ```
+
+The tests cover the ANOVA calculation and the web interface. The business-logic
+test compares the program's output with values calculated separately for the
+small balanced dataset below; it does not use the program to generate its
+expected answers.
+
+| Group | Treatment | Measurements | Cell mean |
+|---|---|---:|---:|
+| G1 | T1 | 1, 2 | 1.5 |
+| G1 | T2 | 3, 4 | 3.5 |
+| G2 | T1 | 5, 6 | 5.5 |
+| G2 | T2 | 9, 10 | 9.5 |
+
+The grand mean is 5. The group means are 2.5 and 7.5, and the treatment means
+are 3.5 and 6.5. There are two measurements in each cell. Using the standard
+balanced two-way ANOVA sums-of-squares formulas:
+
+- Group: `2 treatments * 2 measurements * ((2.5 - 5)^2 + (7.5 - 5)^2) = 50`.
+- Treatment: `2 groups * 2 measurements * ((3.5 - 5)^2 + (6.5 - 5)^2) = 18`.
+- Interaction: each cell's interaction deviation is
+  `cell mean - group mean - treatment mean + grand mean`, giving `0.5, -0.5,
+  -0.5, 0.5`. Thus `2 measurements * sum(deviation^2) = 2`.
+- Error: each cell has two observations half a unit from its cell mean, so
+  `4 cells * ((-0.5)^2 + 0.5^2) = 2`.
+
+The error degrees of freedom are `2 groups * 2 treatments * (2 measurements -
+1) = 4`, so the mean squared error is `2 / 4 = 0.5`. Each effect has one
+degree of freedom, so `F = effect sum of squares / 0.5`. The expected results
+are:
+
+| Effect | F statistic | p-value (F distribution, 1 and 4 df) | Partial eta-squared |
+|---|---:|---:|---:|
+| Group | 100 | 0.0005620 | `50 / (50 + 2)` = 0.961538 |
+| Treatment | 36 | 0.0038825 | `18 / (18 + 2)` = 0.9 |
+| Group x Treatment | 4 | 0.1161165 | `2 / (2 + 2)` = 0.5 |
+
+The test calculates the F(1, 4) upper-tail p-value with the closed-form
+expression `1 - 1.5*sqrt(F/(F+4)) + 0.5*(F/(F+4))^(3/2)`. Partial eta-squared
+is calculated as `effect sum of squares / (effect sum of squares + error sum
+of squares)`. These reference calculations are independent of the application's
+Statsmodels ANOVA output.
+
+A separate business-logic test verifies that data with only one observation
+per group-treatment cell is rejected because there are no residual degrees of
+freedom to estimate error. The web tests check that the form loads, valid data
+displays results, missing measurements are reported, and duplicate factor
+names are rejected.
