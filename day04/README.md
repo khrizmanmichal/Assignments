@@ -15,8 +15,6 @@ I then asked Copilot to improve it into a desktop-style GUI so it would open in 
 - "Make this program open in a nice separate window. Does it need to be changed to HTML for that?"
 - "Add the ANOVA explanation paragraph into the GUI itself, and make the installation instructions much simpler and clearer for someone with no background in this."
 - "Add an option to upload an Excel file with instructions on how to structure it. I also want the measurements in separate columns rather than rows."
-- "Write some tests for the "business logic" of your previous applications. You can put them in your day04."
-- "ok but we need to independantely verify the calculation. if you need an external data set let me know"
 
 This is what I built: a working two-way ANOVA tool with a simple interface, a desktop GUI, a web version, and an Excel import feature that reads biological replicate data in a clear tabular format.
 
@@ -104,7 +102,31 @@ reader.
 py .\day04\two_way_anova.py
 ```
 
-## Run the tests
+# Day 5: Tests
+
+Day 5 was about checking that the application works without manually trying every
+case by hand. The test work belongs to Day 5, even though the test files are
+currently kept inside the Day 4 application's `day04/tests` folder.
+
+## What is inside the test folder?
+
+The `day04/tests` folder contains two Python test files:
+
+| File | What it checks |
+|---|---|
+| `test_app.py` | Checks the web page and web form. |
+| `test_two_way_anova.py` | Checks the ANOVA calculation and its error handling. |
+
+Each test is a small example of something the program should do. A passing test
+means the program behaved as expected for that example.
+
+## Step 1: Start from the project folder
+
+The tests use Python's built-in test runner, so no extra test package is needed.
+Open a terminal in the repository folder. The repository folder is the folder
+that contains `day01`, `day02`, `day03`, and `day04`.
+
+From that folder, run:
 
 ```powershell
 Push-Location .\day04
@@ -112,10 +134,53 @@ py -m unittest discover -s .\tests
 Pop-Location
 ```
 
-The tests cover the ANOVA calculation and the web interface. The business-logic
-test compares the program's output with values calculated separately for the
-small balanced dataset below; it does not use the program to generate its
-expected answers.
+These commands mean:
+
+1. `Push-Location .\day04` enters the Day 4 project folder.
+2. `py -m unittest discover -s .\tests` finds files named `test*.py` and runs
+   every test in the `tests` folder.
+3. `Pop-Location` returns to the original repository folder.
+
+The most important result is the final line:
+
+```text
+OK
+```
+
+This means all discovered tests passed.
+
+## Step 2: What `test_app.py` checks
+
+`test_app.py` uses a test client to send requests to the Flask application. It
+does not need a real browser.
+
+It checks four things:
+
+1. The home page opens successfully.
+2. The page contains the group and treatment fields and the "Run ANOVA" button.
+3. Valid measurements produce an ANOVA results table.
+4. Missing measurements, and repeated factor names, show helpful error messages.
+
+These tests check the web interface and form behavior. They do not calculate the
+expected ANOVA numbers by themselves.
+
+## Step 3: What `test_two_way_anova.py` checks
+
+`test_two_way_anova.py` checks the shared ANOVA business logic. It contains two
+tests:
+
+1. It compares the application result with calculations worked out separately.
+2. It checks that incomplete data is rejected when there are no residual degrees
+   of freedom.
+
+The second test uses only one observation for each group-treatment cell. Because
+the program cannot estimate leftover error variation from that data, it returns
+a clear `ValueError` instead of an unreliable ANOVA result.
+
+## Step 4: Independently checking the calculation
+
+The calculation test uses a small, balanced example that can be checked by hand.
+No external dataset is required.
 
 | Group | Treatment | Measurements | Cell mean |
 |---|---|---:|---:|
@@ -124,37 +189,100 @@ expected answers.
 | G2 | T1 | 5, 6 | 5.5 |
 | G2 | T2 | 9, 10 | 9.5 |
 
-The grand mean is 5. The group means are 2.5 and 7.5, and the treatment means
-are 3.5 and 6.5. There are two measurements in each cell. Using the standard
-balanced two-way ANOVA sums-of-squares formulas:
+The overall mean is 5.
 
-- Group: `2 treatments * 2 measurements * ((2.5 - 5)^2 + (7.5 - 5)^2) = 50`.
-- Treatment: `2 groups * 2 measurements * ((3.5 - 5)^2 + (6.5 - 5)^2) = 18`.
-- Interaction: each cell's interaction deviation is
-  `cell mean - group mean - treatment mean + grand mean`, giving `0.5, -0.5,
-  -0.5, 0.5`. Thus `2 measurements * sum(deviation^2) = 2`.
-- Error: each cell has two observations half a unit from its cell mean, so
-  `4 cells * ((-0.5)^2 + 0.5^2) = 2`.
+- The group means are 2.5 and 7.5.
+- The treatment means are 3.5 and 6.5.
+- There are two measurements in every cell.
 
-The error degrees of freedom are `2 groups * 2 treatments * (2 measurements -
-1) = 4`, so the mean squared error is `2 / 4 = 0.5`. Each effect has one
-degree of freedom, so `F = effect sum of squares / 0.5`. The expected results
-are:
+### Group sum of squares
 
-| Effect | F statistic | p-value (F distribution, 1 and 4 df) | Partial eta-squared |
-|---|---:|---:|---:|
-| Group | 100 | 0.0005620 | `50 / (50 + 2)` = 0.961538 |
-| Treatment | 36 | 0.0038825 | `18 / (18 + 2)` = 0.9 |
-| Group x Treatment | 4 | 0.1161165 | `2 / (2 + 2)` = 0.5 |
+The difference of each group mean from the overall mean is squared and weighted
+by the number of measurements in that group:
 
-The test calculates the F(1, 4) upper-tail p-value with the closed-form
-expression `1 - 1.5*sqrt(F/(F+4)) + 0.5*(F/(F+4))^(3/2)`. Partial eta-squared
-is calculated as `effect sum of squares / (effect sum of squares + error sum
-of squares)`. These reference calculations are independent of the application's
-Statsmodels ANOVA output.
+```text
+2 treatments * 2 measurements * ((2.5 - 5)^2 + (7.5 - 5)^2)
+= 50
+```
 
-A separate business-logic test verifies that data with only one observation
-per group-treatment cell is rejected because there are no residual degrees of
-freedom to estimate error. The web tests check that the form loads, valid data
-displays results, missing measurements are reported, and duplicate factor
-names are rejected.
+### Treatment sum of squares
+
+The difference of each treatment mean from the overall mean is squared and
+weighted by the number of measurements in that treatment:
+
+```text
+2 groups * 2 measurements * ((3.5 - 5)^2 + (6.5 - 5)^2)
+= 18
+```
+
+### Interaction sum of squares
+
+First, find the interaction deviation for each cell:
+
+```text
+cell mean - group mean - treatment mean + overall mean
+```
+
+The four deviations are `0.5`, `-0.5`, `-0.5`, and `0.5`. Each deviation is
+squared and weighted by the two measurements in its cell:
+
+```text
+2 measurements * (0.5^2 + (-0.5)^2 + (-0.5)^2 + 0.5^2)
+= 2
+```
+
+### Error sum of squares
+
+Within each cell, both observations are 0.5 away from the cell mean. Thus:
+
+```text
+4 cells * ((-0.5)^2 + 0.5^2)
+= 2
+```
+
+### F statistics
+
+There are four error degrees of freedom:
+
+```text
+2 groups * 2 treatments * (2 measurements - 1) = 4
+```
+
+The mean squared error is:
+
+```text
+2 error sum of squares / 4 error degrees of freedom = 0.5
+```
+
+Each effect has one degree of freedom, so the F statistic is:
+
+```text
+effect sum of squares / 0.5
+```
+
+| Effect | Effect sum of squares | F statistic | p-value | Partial eta-squared |
+|---|---:|---:|---:|---:|
+| Group | 50 | 100 | 0.0005620 | `50 / (50 + 2)` = 0.961538 |
+| Treatment | 18 | 36 | 0.0038825 | `18 / (18 + 2)` = 0.9 |
+| Group x Treatment | 2 | 4 | 0.1161165 | `2 / (2 + 2)` = 0.5 |
+
+The p-values above are for an F distribution with 1 and 4 degrees of freedom.
+The test calculates them using this independent closed-form expression:
+
+```text
+1 - 1.5 * sqrt(F / (F + 4)) + 0.5 * (F / (F + 4))^(3/2)
+```
+
+Partial eta-squared is the effect sum of squares divided by the effect sum of
+squares plus the error sum of squares.
+
+These reference values were calculated independently of the Statsmodels output
+used inside the application. This makes the test useful: if the application
+calculation changes incorrectly, the test can catch the difference.
+
+## Prompts used for the testing work
+
+- "Write some tests for the "business logic" of your previous applications. You can put them in your day04."
+- "ok but we need to independantely verify the calculation. if you need an external data set let me know"
+- "include in the read me in a simple explanation the tests and calculations, if you performed calculations also write them out, and add the prompts i used"
+- "seperate it in a way that explains that the tests belong to day 05 and also what exactly is inside the test folder. really go step by step and simply for people with no coing background"
